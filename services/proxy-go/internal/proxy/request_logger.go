@@ -105,11 +105,17 @@ func (l *requestLogger) run() {
 func (l *requestLogger) insertBatch(ctx context.Context, batch []accessLogEntry) error {
 	values := make([]string, 0, len(batch))
 	args := make([]any, 0, len(batch)*7)
-	for i, entry := range batch {
-		offset := i*7 + 1
+	rowIndex := 0
+	for _, entry := range batch {
+		id, err := generateRandomUUIDv4()
+		if err != nil {
+			log.Printf("request logger uuid generation failed: %v", err)
+			continue
+		}
+		offset := rowIndex*7 + 1
 		values = append(values, fmt.Sprintf("($%d::uuid, $%d, $%d, $%d, $%d, $%d, $%d)", offset, offset+1, offset+2, offset+3, offset+4, offset+5, offset+6))
 		args = append(args,
-			newRandomUUID(),
+			id,
 			normalizeDBText(entry.Host),
 			normalizeDBText(entry.Method),
 			normalizeDBText(entry.Path),
@@ -117,6 +123,10 @@ func (l *requestLogger) insertBatch(ctx context.Context, batch []accessLogEntry)
 			normalizeDBText(entry.RemoteIP),
 			normalizeDBText(entry.UserAgent),
 		)
+		rowIndex++
+	}
+	if len(values) == 0 {
+		return nil
 	}
 	_, err := l.pg.DB.ExecContext(
 		ctx,
@@ -130,9 +140,11 @@ func normalizeDBText(v string) string {
 	return strings.TrimSpace(v)
 }
 
-func newRandomUUID() string {
+func generateRandomUUIDv4() (string, error) {
 	var b [16]byte
-	_, _ = rand.Read(b[:])
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
 	buf := make([]byte, 36)
@@ -145,7 +157,7 @@ func newRandomUUID() string {
 	hex.Encode(buf[19:23], b[8:10])
 	buf[23] = '-'
 	hex.Encode(buf[24:36], b[10:16])
-	return string(buf)
+	return string(buf), nil
 }
 
 type statusCaptureWriter struct {

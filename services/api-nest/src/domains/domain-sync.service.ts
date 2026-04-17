@@ -32,6 +32,9 @@ export class DomainSyncService implements OnModuleDestroy {
       return;
     }
     await this.connectPromise;
+    if (!this.client.isOpen) {
+      return;
+    }
     await this.client.publish(this.channel, normalizedHost).catch((error: unknown) => {
       this.logger.warn(`redis publish failed for ${normalizedHost}: ${(error as Error)?.message ?? 'unknown error'}`);
     });

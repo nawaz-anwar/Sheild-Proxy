@@ -47,11 +47,15 @@ func (d *Dependencies) Close() {
 		return
 	}
 	if d.Redis != nil {
-		_ = d.Redis.Client.Close()
+		if err := d.Redis.Client.Close(); err != nil {
+			log.Printf("runtime: redis close error addr=%s err=%v", d.Redis.Addr, err)
+		}
 		log.Printf("runtime: redis client closed addr=%s", d.Redis.Addr)
 	}
 	if d.Postgres != nil {
-		_ = d.Postgres.DB.Close()
+		if err := d.Postgres.DB.Close(); err != nil {
+			log.Printf("runtime: postgres close error err=%v", err)
+		}
 		log.Printf("runtime: postgres client closed")
 	}
 }

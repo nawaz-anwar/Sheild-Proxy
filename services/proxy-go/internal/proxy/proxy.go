@@ -345,14 +345,23 @@ func (p *Proxy) startRedisInvalidationSubscriber(redisClient *runtime.RedisClien
 	go func() {
 		pubsub := redisClient.Client.Subscribe(subCtx, channel)
 		defer pubsub.Close()
-		for msg := range pubsub.Channel() {
-			host := strings.ToLower(strings.TrimSpace(msg.Payload))
-			if host == "" {
-				continue
-			}
-			p.store.Delete(host)
-			if p.l2 != nil {
-				p.l2.Delete(context.Background(), host)
+		ch := pubsub.Channel()
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return
+				}
+				host := strings.ToLower(strings.TrimSpace(msg.Payload))
+				if host == "" {
+					continue
+				}
+				p.store.Delete(host)
+				if p.l2 != nil {
+					p.l2.Delete(context.Background(), host)
+				}
 			}
 		}
 	}()
