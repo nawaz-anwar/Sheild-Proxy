@@ -1,7 +1,13 @@
 # Integration Validation (Phase 1)
 
-Expected flow:
+Run:
+
+```bash
+./tests/integration/phase1_flow.sh
+```
+
+Flow covered:
 1. Register domain.
 2. Verify DNS token.
-3. Confirm domain status = active.
-4. Send request through edge/proxy and confirm forwarded response with verified headers at origin.
+3. Read domain status.
+4. Validate onboarding/proxy prerequisites for end-to-end routing.

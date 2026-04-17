@@ -1,0 +1,1 @@
+import{_ as n,B as o,C as a,A as r}from"./BpmskxdY.js";const s={};function l(t,e){return r(),o("main",null,[...e[0]||(e[0]=[a("h1",null,"Shield Proxy Dashboard (Phase 1)",-1),a("p",null,"Core proxy onboarding is available. Advanced controls land in later phases.",-1)])])}const d=n(s,[["render",l]]);export{d as default};
