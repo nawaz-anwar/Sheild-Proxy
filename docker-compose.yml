@@ -32,8 +32,12 @@ services:
   api:
     build:
       context: ./services/api-nest
-    env_file:
-      - ./config/platform.env.example
+    environment:
+      API_PORT: 3000
+      DATABASE_DSN: postgresql://shield:shield@postgres:5432/shield_proxy
+      JWT_SECRET: shield-local-dev-secret-minimum-32-characters-required
+      ORIGIN_SECRET: origin-local-dev-secret-minimum-32-characters-required
+      REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
     depends_on:
@@ -43,6 +47,9 @@ services:
   dashboard:
     build:
       context: ./services/dashboard-nuxt
+    environment:
+      NUXT_BACKEND_API_BASE: http://api:3000
+      PORT: 3001
     ports:
       - "3001:3001"
     depends_on:
