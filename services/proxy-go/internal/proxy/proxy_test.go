@@ -45,7 +45,7 @@ func TestProxyInjectsHeadersAndForwards(t *testing.T) {
 	})
 
 	var count uint64
-	p := New(cfg, &count)
+	p := New(cfg, nil, &count)
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
 	req.Host = "example.com"
@@ -78,7 +78,7 @@ func TestProxyRejectsInvalidTokenBeforeFilter(t *testing.T) {
 	cfg.JWT.TTLSeconds = 900
 
 	var count uint64
-	p := New(cfg, &count)
+	p := New(cfg, nil, &count)
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
 	req.Host = "example.com"
@@ -121,7 +121,7 @@ func TestProxyAcceptsValidToken(t *testing.T) {
 	}
 
 	var count uint64
-	p := New(cfg, &count)
+	p := New(cfg, nil, &count)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
 	req.Host = "example.com"
 	req.RemoteAddr = "203.0.113.10:12345"

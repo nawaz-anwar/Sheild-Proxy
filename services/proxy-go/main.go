@@ -32,7 +32,8 @@ func main() {
 	defer deps.Close()
 
 	var requestCount uint64
-	p := proxy.New(cfg, &requestCount)
+	p := proxy.New(cfg, deps, &requestCount)
+	defer p.Close()
 
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
