@@ -62,4 +62,39 @@ Deployment compose scaffolds now include:
 - Observability services: Prometheus and Grafana
 - Prometheus scrape config at `deployment/prometheus/prometheus.yml`
 
+## Part 6: Security, environment, and data lifecycle
+
+Environment variable surface now includes:
+
+- `JWT_SECRET` (or `JWT_SECRET_FILE`)
+- `REDIS_PASSWORD` (or `REDIS_PASSWORD_FILE`)
+- `DATABASE_DSN` (or `DATABASE_DSN_FILE`)
+- `ORIGIN_SECRET` (or `ORIGIN_SECRET_FILE`)
+
+Security and operations hardening updates include:
+
+- Docker secrets scaffold in `deployment/docker-compose.prod.yml`
+- SSL certificate mount path scaffold for edge nginx (`deployment/nginx/certs`)
+- Internal/private network segmentation for stateful and app services in production compose
+- Startup enforcement for JWT secret in API and secret/env overrides in proxy
+
+Database schema lifecycle additions:
+
+- Core tables: `clients`, `domains`, `proxy_rules`, `request_logs`
+- TimescaleDB migration scaffold in `db/migrations/002_phase6_timescale.sql` for:
+  - hypertable conversion
+  - compression policy
+  - retention policy
+
+## Final summary
+
+ShieldProxy is a multi-layer security reverse proxy with:
+
+- Rate limiting
+- Bot detection
+- Geo filtering
+- JS challenge
+- JWT validation
+- Analytics dashboard
+
 These are implementation foundations intended for iterative hardening in subsequent phases.

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/config"
@@ -19,6 +21,9 @@ func main() {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
+	}
+	if err := applyEnvOverrides(cfg); err != nil {
+		log.Fatalf("failed to apply env overrides: %v", err)
 	}
 	deps, err := runtime.Init(cfg)
 	if err != nil {
@@ -84,4 +89,55 @@ func fmtUint(v uint64) string {
 		v /= 10
 	}
 	return string(buf[i:])
+}
+
+func applyEnvOverrides(cfg *config.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+	if dsn := strings.TrimSpace(os.Getenv("DATABASE_DSN")); dsn != "" {
+		cfg.Postgres.DSN = dsn
+	}
+	if jwtSecret, err := envOrFile("JWT_SECRET"); err != nil {
+		return err
+	} else if jwtSecret != "" {
+		cfg.JWT.Secret = jwtSecret
+	}
+	if originSecret, err := envOrFile("ORIGIN_SECRET"); err != nil {
+		return err
+	} else if originSecret != "" {
+		cfg.Proxy.Signing.Secret = originSecret
+	}
+	if cfg.Proxy.Signing.Secret == "" {
+		cfg.Proxy.Signing.Secret = cfg.JWT.Secret
+	}
+	if redisPassword, err := envOrFile("REDIS_PASSWORD"); err != nil {
+		return err
+	} else if redisPassword != "" {
+		addr := strings.TrimSpace(cfg.Redis.Addr)
+		switch {
+		case addr == "":
+			// leave runtime validation to existing checks
+		case strings.HasPrefix(addr, "redis://") && !strings.Contains(addr, "@"):
+			cfg.Redis.Addr = "redis://:" + redisPassword + "@" + strings.TrimPrefix(addr, "redis://")
+		case !strings.HasPrefix(addr, "redis://") && !strings.Contains(addr, "@"):
+			cfg.Redis.Addr = "redis://:" + redisPassword + "@" + addr
+		}
+	}
+	return nil
+}
+
+func envOrFile(key string) (string, error) {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v, nil
+	}
+	path := strings.TrimSpace(os.Getenv(key + "_FILE"))
+	if path == "" {
+		return "", nil
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s_FILE: %w", key, err)
+	}
+	return strings.TrimSpace(string(b)), nil
 }
