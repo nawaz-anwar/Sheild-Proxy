@@ -38,7 +38,7 @@ _, _ = w.Write([]byte("ok"))
 metricsMux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
 w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 _, _ = w.Write([]byte("shield_proxy_requests_total "))
-_, _ = w.Write([]byte([]byte(fmtUint(atomic.LoadUint64(&requestCount)))))
+_, _ = w.Write([]byte(fmtUint(atomic.LoadUint64(&requestCount))))
 _, _ = w.Write([]byte("\n"))
 })
 
