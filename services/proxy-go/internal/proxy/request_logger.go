@@ -109,7 +109,7 @@ func (l *requestLogger) insertBatch(ctx context.Context, batch []accessLogEntry)
 	for _, entry := range batch {
 		id, err := generateRandomUUIDv4()
 		if err != nil {
-			log.Printf("request logger uuid generation failed: %v", err)
+			log.Printf("request logger uuid generation failed host=%s path=%s: %v", entry.Host, entry.Path, err)
 			continue
 		}
 		offset := rowIndex*7 + 1

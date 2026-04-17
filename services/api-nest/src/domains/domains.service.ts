@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { resolveTxt } from 'dns/promises';
 import { DatabaseService } from '../database/database.service';
@@ -13,6 +13,8 @@ type RegisterResult = {
 
 @Injectable()
 export class DomainsService {
+  private readonly logger = new Logger(DomainsService.name);
+
   constructor(
     private readonly db: DatabaseService,
     private readonly rulesService: RulesService,
@@ -90,6 +92,8 @@ export class DomainsService {
     const domain = await this.db.query<{ domain: string }>('SELECT domain FROM domains WHERE id = $1', [domainId]);
     if ((domain.rowCount ?? 0) > 0) {
       await this.domainSyncService.publishDomainSync(domain.rows[0].domain);
+    } else {
+      this.logger.warn(`domain sync skipped after rules update: domain not found id=${domainId}`);
     }
     return result;
   }

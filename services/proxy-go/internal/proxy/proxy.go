@@ -269,9 +269,9 @@ func (p *Proxy) handleVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderChallengePage(challengeID, prefix, difficulty string) string {
-	challengeID = jsString(challengeID)
-	prefix = jsString(prefix)
-	difficulty = jsString(difficulty)
+	challengeID = escapeJSString(challengeID)
+	prefix = escapeJSString(prefix)
+	difficulty = escapeJSString(difficulty)
 	return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Security verification</title><style>body{font-family:system-ui,-apple-system,sans-serif;margin:2rem;max-width:640px}code{background:#f4f4f5;padding:0.1rem 0.25rem;border-radius:4px}</style></head>
@@ -299,10 +299,11 @@ run();
 </body></html>`
 }
 
-func jsString(in string) string {
+func escapeJSString(in string) string {
 	in = strings.ReplaceAll(in, "\\", "\\\\")
 	in = strings.ReplaceAll(in, "\"", "\\\"")
 	in = strings.ReplaceAll(in, "'", "\\'")
+	in = strings.ReplaceAll(in, "`", "\\u0060")
 	in = strings.ReplaceAll(in, "<", "\\u003c")
 	in = strings.ReplaceAll(in, ">", "\\u003e")
 	in = strings.ReplaceAll(in, "&", "\\u0026")
