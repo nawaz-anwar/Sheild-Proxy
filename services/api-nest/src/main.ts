@@ -12,6 +12,11 @@ async function bootstrap() {
   if (jwtSecret.length < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters');
   }
+  const originSecret = readFromEnvOrFile('ORIGIN_SECRET');
+  const mode = (process.env.ENV ?? process.env.MODE ?? '').trim().toLowerCase();
+  if ((mode === 'prod' || mode === 'production') && originSecret && originSecret === jwtSecret) {
+    throw new Error('ORIGIN_SECRET must be different from JWT_SECRET in production');
+  }
   process.env.JWT_SECRET = jwtSecret;
   const app = await NestFactory.create(AppModule);
   await app.listen(Number(process.env.API_PORT ?? 3000));

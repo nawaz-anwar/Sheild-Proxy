@@ -45,7 +45,7 @@ func New(domains []config.DomainConfig, l2 Provider, l3 Provider) *Store {
 }
 
 func (s *Store) Get(ctx context.Context, host string) (Domain, bool) {
-	h := strings.ToLower(strings.TrimSpace(host))
+	h := normalizeHost(host)
 	s.mu.RLock()
 	d, ok := s.l1[h]
 	s.mu.RUnlock()
@@ -75,4 +75,27 @@ func (s *Store) putL1(host string, d Domain) {
 	s.mu.Lock()
 	s.l1[host] = d
 	s.mu.Unlock()
+}
+
+func (s *Store) Set(d Domain) {
+	host := normalizeHost(d.Host)
+	if host == "" {
+		return
+	}
+	d.Host = host
+	s.putL1(host, d)
+}
+
+func (s *Store) Delete(host string) {
+	h := normalizeHost(host)
+	if h == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.l1, h)
+	s.mu.Unlock()
+}
+
+func normalizeHost(host string) string {
+	return strings.ToLower(strings.TrimSpace(host))
 }

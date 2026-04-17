@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { resolveTxt } from 'dns/promises';
 import { DatabaseService } from '../database/database.service';
 import { RuleInput, RulesService } from '../rules/rules.service';
+import { DomainSyncService } from './domain-sync.service';
 
 type RegisterResult = {
   domainId: string;
@@ -12,9 +13,12 @@ type RegisterResult = {
 
 @Injectable()
 export class DomainsService {
+  private readonly logger = new Logger(DomainsService.name);
+
   constructor(
     private readonly db: DatabaseService,
     private readonly rulesService: RulesService,
+    private readonly domainSyncService: DomainSyncService,
   ) {}
 
   async register(clientName: string, domain: string, upstreamUrl: string): Promise<RegisterResult> {
@@ -29,6 +33,7 @@ export class DomainsService {
        ON CONFLICT (domain) DO UPDATE SET upstream_url = EXCLUDED.upstream_url, dns_token = EXCLUDED.dns_token, status = 'pending_verification'`,
       [domainId, clientId, domain, upstreamUrl, dnsToken],
     );
+    await this.domainSyncService.publishDomainSync(domain);
 
     return { domainId, dnsToken, status: 'pending_verification' };
   }
@@ -57,6 +62,7 @@ export class DomainsService {
 
     if (matches) {
       await this.db.query("UPDATE domains SET status = 'active', verified_at = NOW() WHERE id = $1", [id]);
+      await this.domainSyncService.publishDomainSync(domain);
       return { id, status: 'active', verified: true };
     }
 
@@ -82,6 +88,13 @@ export class DomainsService {
   }
 
   async updateRules(domainId: string, rules: RuleInput[]) {
-    return this.rulesService.replaceDomainRules(domainId, rules);
+    const result = await this.rulesService.replaceDomainRules(domainId, rules);
+    const domain = await this.db.query<{ domain: string }>('SELECT domain FROM domains WHERE id = $1', [domainId]);
+    if ((domain.rowCount ?? 0) > 0) {
+      await this.domainSyncService.publishDomainSync(domain.rows[0].domain);
+    } else {
+      this.logger.warn(`domain sync skipped after rules update: domain not found id=${domainId}`);
+    }
+    return result;
   }
 }
