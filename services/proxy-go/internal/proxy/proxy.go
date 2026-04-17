@@ -36,6 +36,7 @@ type Proxy struct {
 	logWriter      *requestLogger
 	l2             *redisDomainProvider
 	l3             *postgresDomainProvider
+	subCancel      context.CancelFunc
 }
 
 type requestLog struct {
@@ -71,6 +72,9 @@ func New(cfg *config.Config, deps *runtime.Dependencies, requestCount *uint64) *
 }
 
 func (p *Proxy) Close() {
+	if p.subCancel != nil {
+		p.subCancel()
+	}
 	if p.logWriter != nil {
 		p.logWriter.Close()
 	}
@@ -298,6 +302,10 @@ run();
 func jsString(in string) string {
 	in = strings.ReplaceAll(in, "\\", "\\\\")
 	in = strings.ReplaceAll(in, "\"", "\\\"")
+	in = strings.ReplaceAll(in, "'", "\\'")
+	in = strings.ReplaceAll(in, "<", "\\u003c")
+	in = strings.ReplaceAll(in, ">", "\\u003e")
+	in = strings.ReplaceAll(in, "&", "\\u0026")
 	in = strings.ReplaceAll(in, "\n", "")
 	in = strings.ReplaceAll(in, "\r", "")
 	return in
@@ -332,8 +340,10 @@ func (p *Proxy) startRedisInvalidationSubscriber(redisClient *runtime.RedisClien
 		channel = "shield"
 	}
 	channel = channel + ":domain:sync"
+	subCtx, cancel := context.WithCancel(context.Background())
+	p.subCancel = cancel
 	go func() {
-		pubsub := redisClient.Client.Subscribe(context.Background(), channel)
+		pubsub := redisClient.Client.Subscribe(subCtx, channel)
 		defer pubsub.Close()
 		for msg := range pubsub.Channel() {
 			host := strings.ToLower(strings.TrimSpace(msg.Payload))

@@ -109,7 +109,7 @@ func (l *requestLogger) insertBatch(ctx context.Context, batch []accessLogEntry)
 		offset := i*7 + 1
 		values = append(values, fmt.Sprintf("($%d::uuid, $%d, $%d, $%d, $%d, $%d, $%d)", offset, offset+1, offset+2, offset+3, offset+4, offset+5, offset+6))
 		args = append(args,
-			newUUID(),
+			newRandomUUID(),
 			normalizeDBText(entry.Host),
 			normalizeDBText(entry.Method),
 			normalizeDBText(entry.Path),
@@ -130,7 +130,7 @@ func normalizeDBText(v string) string {
 	return strings.TrimSpace(v)
 }
 
-func newUUID() string {
+func newRandomUUID() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
 	b[6] = (b[6] & 0x0f) | 0x40

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -107,7 +108,7 @@ func (p *postgresDomainProvider) Get(ctx context.Context, host string) (domainst
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return domainstore.Domain{}, false, err
 		}
-		if strings.Contains(strings.ToLower(err.Error()), "no rows") {
+		if errors.Is(err, sql.ErrNoRows) {
 			return domainstore.Domain{}, false, nil
 		}
 		return domainstore.Domain{}, false, err

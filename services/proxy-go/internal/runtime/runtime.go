@@ -70,7 +70,7 @@ func initRedis(cfg config.RedisConfig) (*RedisClient, error) {
 	defer cancel()
 	if err := client.Ping(ctx).Err(); err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("redis ping failed: %w", err)
+		return nil, fmt.Errorf("redis ping failed addr=%s: %w", addr, err)
 	}
 	log.Printf("runtime: redis initialized addr=%s", addr)
 	return &RedisClient{Client: client, Addr: addr, Prefix: strings.TrimSpace(cfg.KeyPrefix)}, nil
@@ -92,7 +92,7 @@ func initPostgres(cfg config.PostgresConfig) (*PostgresClient, error) {
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("postgres ping failed: %w", err)
+		return nil, fmt.Errorf("postgres ping failed dsn=%s: %w", sanitizeDSN(dsn), err)
 	}
 	log.Printf("runtime: postgres initialized")
 	return &PostgresClient{DB: db, DSN: dsn}, nil
@@ -117,4 +117,23 @@ func redisOptions(addr string) (*redis.Options, error) {
 		return nil, fmt.Errorf("invalid redis addr: %w", err)
 	}
 	return &redis.Options{Addr: normalized}, nil
+}
+
+func sanitizeDSN(dsn string) string {
+	if dsn == "" {
+		return ""
+	}
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return "<invalid-dsn>"
+	}
+	if u.User != nil {
+		username := u.User.Username()
+		if username != "" {
+			u.User = url.UserPassword(username, "******")
+		} else {
+			u.User = nil
+		}
+	}
+	return u.String()
 }

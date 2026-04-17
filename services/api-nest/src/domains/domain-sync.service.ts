@@ -1,8 +1,9 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { createClient, RedisClientType } from 'redis';
 
 @Injectable()
 export class DomainSyncService implements OnModuleDestroy {
+  private readonly logger = new Logger(DomainSyncService.name);
   private readonly prefix = (process.env.REDIS_KEY_PREFIX ?? 'shield').trim() || 'shield';
   private readonly channel = `${this.prefix}:domain:sync`;
   private readonly client: RedisClientType | null;
@@ -17,7 +18,12 @@ export class DomainSyncService implements OnModuleDestroy {
     }
     const url = addr.includes('://') ? addr : `redis://${addr}`;
     this.client = createClient({ url });
-    this.connectPromise = this.client.connect().then(() => undefined).catch(() => undefined);
+    this.connectPromise = this.client
+      .connect()
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        this.logger.warn(`redis domain sync disabled: ${(error as Error)?.message ?? 'connection failed'}`);
+      });
   }
 
   async publishDomainSync(host: string) {
@@ -26,7 +32,9 @@ export class DomainSyncService implements OnModuleDestroy {
       return;
     }
     await this.connectPromise;
-    await this.client.publish(this.channel, normalizedHost).catch(() => undefined);
+    await this.client.publish(this.channel, normalizedHost).catch((error: unknown) => {
+      this.logger.warn(`redis publish failed for ${normalizedHost}: ${(error as Error)?.message ?? 'unknown error'}`);
+    });
   }
 
   async onModuleDestroy() {
