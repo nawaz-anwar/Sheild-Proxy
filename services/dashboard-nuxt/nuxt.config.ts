@@ -3,6 +3,6 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   modules: ['@pinia/nuxt'],
   runtimeConfig: {
-    backendApiBase: process.env.BACKEND_API_BASE ?? 'http://api-nest:3000',
+    backendApiBase: process.env.NUXT_BACKEND_API_BASE ?? 'http://api:3000',
   },
 });
