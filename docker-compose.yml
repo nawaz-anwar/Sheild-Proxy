@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shield_proxy
+      POSTGRES_USER: shield
+      POSTGRES_PASSWORD: shield
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  proxy:
+    build:
+      context: ./services/proxy-go
+    environment:
+      PROXY_HTTP_ADDR: :8080
+      PROXY_METRICS_ADDR: :9090
+      CONFIG_FILE: /workspace/config/platform.yaml
+    volumes:
+      - ./config:/workspace/config:ro
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      - redis
+      - postgres
+
+  api:
+    build:
+      context: ./services/api-nest
+    env_file:
+      - ./config/platform.env.example
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+
+  dashboard:
+    build:
+      context: ./services/dashboard-nuxt
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api
+      - proxy

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { resolveTxt } from 'dns/promises';
 import { DatabaseService } from '../database/database.service';
+import { RuleInput, RulesService } from '../rules/rules.service';
 
 type RegisterResult = {
   domainId: string;
@@ -11,7 +12,10 @@ type RegisterResult = {
 
 @Injectable()
 export class DomainsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly rulesService: RulesService,
+  ) {}
 
   async register(clientName: string, domain: string, upstreamUrl: string): Promise<RegisterResult> {
     const clientId = randomUUID();
@@ -62,5 +66,22 @@ export class DomainsService {
   async countDomains(): Promise<number> {
     const result = await this.db.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM domains');
     return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async list() {
+    const result = await this.db.query<{ id: string; domain: string; upstream_url: string; status: string; created_at: Date }>(
+      'SELECT id, domain, upstream_url, status, created_at FROM domains ORDER BY created_at DESC',
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      domain: row.domain,
+      upstreamUrl: row.upstream_url,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async updateRules(domainId: string, rules: RuleInput[]) {
+    return this.rulesService.replaceDomainRules(domainId, rules);
   }
 }

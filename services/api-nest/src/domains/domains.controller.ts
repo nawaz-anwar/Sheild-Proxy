@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { DomainsService } from './domains.service';
 
 @Controller('/domains')
 export class DomainsController {
   constructor(private readonly domainsService: DomainsService) {}
+
+  @Get()
+  list() {
+    return this.domainsService.list();
+  }
 
   @Post('/register')
   register(@Body() body: { clientName: string; domain: string; upstreamUrl: string }) {
@@ -18,5 +23,13 @@ export class DomainsController {
   @Post('/:id/verify-dns')
   verifyDns(@Param('id') id: string) {
     return this.domainsService.verifyDns(id);
+  }
+
+  @Put('/:id/rules')
+  updateRules(
+    @Param('id') id: string,
+    @Body() body: { rules: Array<{ pathPrefix: string; action: 'proxy' | 'block' | 'challenge' }> },
+  ) {
+    return this.domainsService.updateRules(id, body.rules ?? []);
   }
 }

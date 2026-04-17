@@ -7,13 +7,42 @@ proxy:
       upstream: http://dashboard-nuxt:3001
       client_id: local-dev
       active: true
-api:
-  domain_verification_prefix: _shield-verify
+  filter:
+    allowlist_ips: []
+    banned_ips: []
+  rate_limit:
+    enabled: true
+    window_seconds: 60
+    max_requests: 120
+  header_analysis:
+    enabled: true
+    blocked_bot_keywords: ["curl", "python-requests", "scrapy"]
+    seo_bot_allowlist: ["googlebot", "bingbot", "duckduckbot", "yandexbot"]
+  challenge:
+    enabled: true
+    difficulty: 3
+    ttl_seconds: 300
+    cookie_name: shield_challenge
+  signing:
+    enabled: true
+    secret: shield-local-dev-secret
+    header: X-Shield-Signature
+    timestamp_header: X-Shield-Signature-Timestamp
 redis:
+  addr: redis:6379
   key_prefix: shield
-  conventions:
-    challenge: "shield:challenge:{domain}:{ip}"
-    ratelimit: "shield:ratelimit:{domain}:{ip}:{window}"
-  ttl_seconds:
-    challenge: 900
-    ratelimit_window: 60
+postgres:
+  dsn: postgres://shield:shield@postgres:5432/shield_proxy?sslmode=disable
+jwt:
+  issuer: shield-proxy
+  audience: shield-origin
+  secret: shield-local-dev-secret
+  cookie_name: shield_token
+  ttl_seconds: 900
+geoip:
+  enabled: false
+  default_allow: true
+  allowed_countries: []
+  blocked_countries: []
+  blocked_asns: []
+  mock_data: {}

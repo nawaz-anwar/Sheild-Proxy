@@ -15,7 +15,9 @@
   "type": "commonjs",
   "private": "true",
   "dependencies": {
-    "nuxt": "^3.16.0"
+    "@pinia/nuxt": "^0.11.3",
+    "nuxt": "^3.16.0",
+    "pinia": "^3.0.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.2"
