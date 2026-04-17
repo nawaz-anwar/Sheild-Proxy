@@ -23,6 +23,11 @@ proxy:
     difficulty: 3
     ttl_seconds: 300
     cookie_name: shield_challenge
+  signing:
+    enabled: true
+    secret: shield-local-dev-secret
+    header: X-Shield-Signature
+    timestamp_header: X-Shield-Signature-Timestamp
 redis:
   addr: redis:6379
   key_prefix: shield

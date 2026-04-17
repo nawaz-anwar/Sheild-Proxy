@@ -8,6 +8,7 @@ import (
 
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/config"
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/proxy"
+	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/runtime"
 )
 
 func main() {
@@ -19,6 +20,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
+	deps, err := runtime.Init(cfg)
+	if err != nil {
+		log.Fatalf("failed to init runtime dependencies: %v", err)
+	}
+	defer deps.Close()
 
 	var requestCount uint64
 	p := proxy.New(cfg, &requestCount)

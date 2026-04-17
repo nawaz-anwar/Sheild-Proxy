@@ -27,5 +27,17 @@ The Go proxy now includes scaffolded modules for:
 - Filter engine pipeline (`Allowlist → Ban → Rate Limit → Geo → Headers`)
 - JS challenge (SHA256 puzzle challenge issue/verify)
 - JWT cookie token issuance/validation with IP+UA binding
+- Reverse handler flow scaffold (`domain lookup → token validation → filter → challenge/forward`)
+- Origin request HMAC signature injection headers
+- Main entry runtime init hooks for Redis + PostgreSQL dependencies
+
+## NestJS API scaffold (Part 3 start)
+
+The API now exposes scaffold responsibilities for:
+
+- Auth (`POST /auth/register`, `POST /auth/login`)
+- Domain management (`/domains/register`, `/domains/:id/status`, `/domains/:id/verify-dns`, `/domains/:id/rules`)
+- Rules service layer backed by `proxy_rules`
+- Analytics overview endpoint (`GET /analytics/overview`)
 
 These are implementation foundations intended for iterative hardening in subsequent phases.

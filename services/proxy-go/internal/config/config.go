@@ -32,6 +32,7 @@ type ProxyConfig struct {
 	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
 	HeaderAnalysis HeaderAnalysisConfig `yaml:"header_analysis"`
 	Challenge      ChallengeConfig      `yaml:"challenge"`
+	Signing        SigningConfig        `yaml:"signing"`
 }
 
 type ProxyFilterConfig struct {
@@ -56,6 +57,13 @@ type ChallengeConfig struct {
 	Difficulty int    `yaml:"difficulty"`
 	TTLSeconds int    `yaml:"ttl_seconds"`
 	CookieName string `yaml:"cookie_name"`
+}
+
+type SigningConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	Secret          string `yaml:"secret"`
+	Header          string `yaml:"header"`
+	TimestampHeader string `yaml:"timestamp_header"`
 }
 
 type RedisConfig struct {
@@ -124,6 +132,12 @@ func applyDefaults(cfg *Config) {
 	if cfg.Proxy.Challenge.CookieName == "" {
 		cfg.Proxy.Challenge.CookieName = "shield_challenge"
 	}
+	if cfg.Proxy.Signing.Header == "" {
+		cfg.Proxy.Signing.Header = "X-Shield-Signature"
+	}
+	if cfg.Proxy.Signing.TimestampHeader == "" {
+		cfg.Proxy.Signing.TimestampHeader = "X-Shield-Signature-Timestamp"
+	}
 	if cfg.JWT.CookieName == "" {
 		cfg.JWT.CookieName = "shield_token"
 	}
@@ -133,6 +147,9 @@ func applyDefaults(cfg *Config) {
 	if cfg.JWT.Secret == "" {
 		cfg.JWT.Secret = "shield-local-dev-secret"
 		log.Printf("warning: using default JWT secret; override in production")
+	}
+	if cfg.Proxy.Signing.Secret == "" {
+		cfg.Proxy.Signing.Secret = cfg.JWT.Secret
 	}
 	if cfg.JWT.Issuer == "" {
 		cfg.JWT.Issuer = "shield-proxy"

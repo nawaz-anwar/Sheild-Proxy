@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -14,6 +15,8 @@ import (
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/config"
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/domainstore"
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/filter"
+	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/jwt"
+	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/signing"
 )
 
 type hostConfig struct {
@@ -27,6 +30,8 @@ type Proxy struct {
 	store          *domainstore.Store
 	requestCount   *uint64
 	filter         *filter.Engine
+	jwt            *jwt.Service
+	signer         *signing.Signer
 }
 
 type requestLog struct {
@@ -45,6 +50,8 @@ func New(cfg *config.Config, requestCount *uint64) *Proxy {
 		store:          store,
 		requestCount:   requestCount,
 		filter:         filter.New(cfg),
+		jwt:            jwt.New(cfg.JWT.Issuer, cfg.JWT.Audience, cfg.JWT.Secret, cfg.JWT.CookieName, cfg.JWT.TTLSeconds),
+		signer:         signing.New(cfg.Proxy.Signing.Enabled, cfg.Proxy.Signing.Secret, cfg.Proxy.Signing.Header, cfg.Proxy.Signing.TimestampHeader),
 	}
 }
 
@@ -61,6 +68,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hc, ok := toHostConfig(domain)
 	if !ok {
 		http.Error(w, "invalid upstream", http.StatusBadGateway)
+		return
+	}
+	if !p.validateToken(r) {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
 
@@ -89,8 +100,52 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		originalDirector(req)
 		req.Header.Set(p.verifiedHeader, "true")
 		req.Header.Set(p.clientIDHeader, hc.clientID)
+		if header, tsHeader, sig, ts, ok := p.signer.Sign(req.Method, req.URL.RequestURI(), host, hc.clientID, time.Now()); ok {
+			req.Header.Set(header, sig)
+			req.Header.Set(tsHeader, ts)
+		}
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+func (p *Proxy) validateToken(r *http.Request) bool {
+	token := ""
+	if c, err := r.Cookie(p.jwt.CookieName()); err == nil {
+		token = strings.TrimSpace(c.Value)
+	}
+	if token == "" {
+		if bearer, err := jwt.BearerToken(r.Header.Get("Authorization")); err == nil {
+			token = strings.TrimSpace(bearer)
+		}
+	}
+	if token == "" {
+		return true
+	}
+	ip, ok := clientIP(r)
+	if !ok {
+		return false
+	}
+	return p.jwt.Validate(token, ip, r.UserAgent(), time.Now().UTC())
+}
+
+func clientIP(r *http.Request) (string, bool) {
+	if xfwd := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xfwd != "" {
+		parts := strings.Split(xfwd, ",")
+		if len(parts) > 0 {
+			ip := strings.TrimSpace(parts[0])
+			if net.ParseIP(ip) != nil {
+				return ip, true
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil && net.ParseIP(host) != nil {
+		return host, true
+	}
+	if net.ParseIP(strings.TrimSpace(r.RemoteAddr)) != nil {
+		return strings.TrimSpace(r.RemoteAddr), true
+	}
+	return "", false
 }
 
 func toHostConfig(d domainstore.Domain) (hostConfig, bool) {
