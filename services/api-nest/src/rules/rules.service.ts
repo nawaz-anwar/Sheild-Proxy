@@ -19,11 +19,16 @@ export class RulesService {
 
     await this.db.query('DELETE FROM proxy_rules WHERE domain_id = $1', [domainId]);
 
-    for (const rule of rules) {
-      await this.db.query(
-        'INSERT INTO proxy_rules (id, domain_id, path_prefix, action) VALUES ($1, $2, $3, $4)',
-        [randomUUID(), domainId, rule.pathPrefix || '/', rule.action],
-      );
+    if (rules.length > 0) {
+      const values: string[] = [];
+      const params: Array<string> = [];
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        const base = i * 4;
+        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+        params.push(randomUUID(), domainId, rule.pathPrefix || '/', rule.action);
+      }
+      await this.db.query(`INSERT INTO proxy_rules (id, domain_id, path_prefix, action) VALUES ${values.join(', ')}`, params);
     }
 
     return { domainId, rulesCount: rules.length };

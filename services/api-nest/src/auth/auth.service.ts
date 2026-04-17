@@ -1,5 +1,5 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { DatabaseService } from '../database/database.service';
 
 type AuthTokenPayload = {
@@ -17,7 +17,7 @@ export class AuthService {
 
   async register(name: string, email: string, password: string) {
     const id = randomUUID();
-    const passwordHash = this.hash(password);
+    const passwordHash = this.hashPassword(password);
     const result = await this.db.query<{ id: string; email: string }>(
       `INSERT INTO clients (id, name, email, password_hash)
        VALUES ($1, $2, $3, $4)
@@ -39,12 +39,7 @@ export class AuthService {
       throw new UnauthorizedException('invalid credentials');
     }
     const row = result.rows[0];
-    const expected = this.hash(password);
-    if (
-      !row.password_hash ||
-      row.password_hash.length !== expected.length ||
-      !timingSafeEqual(Buffer.from(row.password_hash), Buffer.from(expected))
-    ) {
+    if (!row.password_hash || !this.verifyPassword(password, row.password_hash)) {
       throw new UnauthorizedException('invalid credentials');
     }
     const token = this.signToken({ sub: row.id, email: row.email });
@@ -67,8 +62,23 @@ export class AuthService {
     return data;
   }
 
-  private hash(value: string): string {
-    return createHash('sha256').update(value).digest('hex');
+  private hashPassword(value: string): string {
+    const salt = randomBytes(16).toString('hex');
+    const digest = scryptSync(value, salt, 64).toString('hex');
+    return `${salt}:${digest}`;
+  }
+
+  private verifyPassword(value: string, encoded: string): boolean {
+    const [salt, digestHex] = encoded.split(':');
+    if (!salt || !digestHex) {
+      return false;
+    }
+    const computed = scryptSync(value, salt, 64);
+    const digest = Buffer.from(digestHex, 'hex');
+    if (digest.length !== computed.length) {
+      return false;
+    }
+    return timingSafeEqual(digest, computed);
   }
 
   private signToken(input: { sub: string; email: string }): string {
@@ -93,7 +103,10 @@ export class AuthService {
   }
 
   private sign(unsignedToken: string): string {
-    const secret = process.env.JWT_SECRET ?? 'change-me';
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret === 'change-me') {
+      throw new InternalServerErrorException('JWT_SECRET must be configured');
+    }
     return createHmac('sha256', secret).update(unsignedToken).digest('base64url');
   }
 }
