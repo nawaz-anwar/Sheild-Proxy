@@ -41,7 +41,7 @@ func (l *Limiter) Allow(domain, ip string, now time.Time) (bool, int) {
 
 	hits := l.buckets[key]
 	cut := now.Add(-l.window)
-	pruned := hits[:0]
+	pruned := make([]time.Time, 0, len(hits))
 	for _, t := range hits {
 		if t.After(cut) {
 			pruned = append(pruned, t)

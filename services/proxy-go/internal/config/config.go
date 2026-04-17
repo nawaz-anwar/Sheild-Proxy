@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strings"
 
@@ -131,6 +132,7 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.JWT.Secret == "" {
 		cfg.JWT.Secret = "shield-local-dev-secret"
+		log.Printf("warning: using default JWT secret; override in production")
 	}
 	if cfg.JWT.Issuer == "" {
 		cfg.JWT.Issuer = "shield-proxy"

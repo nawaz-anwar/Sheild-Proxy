@@ -60,7 +60,10 @@ func New(cfg *config.Config) *Engine {
 }
 
 func (e *Engine) Evaluate(r *http.Request, domain string) Decision {
-	ip := clientIP(r)
+	ip, ok := clientIP(r)
+	if !ok {
+		return Decision{Allowed: false, Status: http.StatusForbidden, Body: "unable to determine client ip"}
+	}
 	if _, ok := e.allowlist[ip]; ok {
 		return Decision{Allowed: true}
 	}
@@ -98,6 +101,7 @@ func (e *Engine) Evaluate(r *http.Request, domain string) Decision {
 						Value:    token,
 						Path:     "/",
 						HttpOnly: true,
+						Secure:   true,
 						SameSite: http.SameSiteLaxMode,
 						MaxAge:   int(e.jwt.TTL().Seconds()),
 					},
@@ -105,7 +109,10 @@ func (e *Engine) Evaluate(r *http.Request, domain string) Decision {
 			}
 		}
 	}
-	ch := e.challenge.Create(domain, ip, ua, e.now().UTC())
+	ch, err := e.challenge.Create(domain, ip, ua, e.now().UTC())
+	if err != nil {
+		return Decision{Allowed: false, Status: http.StatusServiceUnavailable, Body: "challenge generation unavailable"}
+	}
 	return Decision{
 		Allowed: false,
 		Status:  http.StatusForbidden,
@@ -119,24 +126,24 @@ func (e *Engine) Evaluate(r *http.Request, domain string) Decision {
 	}
 }
 
-func clientIP(r *http.Request) string {
+func clientIP(r *http.Request) (string, bool) {
 	if xfwd := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xfwd != "" {
 		parts := strings.Split(xfwd, ",")
 		if len(parts) > 0 {
 			ip := strings.TrimSpace(parts[0])
 			if net.ParseIP(ip) != nil {
-				return ip
+				return ip, true
 			}
 		}
 	}
 	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
 	if err == nil && net.ParseIP(host) != nil {
-		return host
+		return host, true
 	}
 	if net.ParseIP(strings.TrimSpace(r.RemoteAddr)) != nil {
-		return strings.TrimSpace(r.RemoteAddr)
+		return strings.TrimSpace(r.RemoteAddr), true
 	}
-	return "0.0.0.0"
+	return "", false
 }
 
 func intToString(v int) string {

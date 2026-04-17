@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -62,16 +63,22 @@ func (m *Manager) CookieName() string {
 	return m.cookieName
 }
 
-func (m *Manager) Create(domain, ip, ua string, now time.Time) Challenge {
-	id := randomHex(12)
-	nonce := randomHex(16)
+func (m *Manager) Create(domain, ip, ua string, now time.Time) (Challenge, error) {
+	id, err := randomHex(12)
+	if err != nil {
+		return Challenge{}, err
+	}
+	nonce, err := randomHex(16)
+	if err != nil {
+		return Challenge{}, err
+	}
 	expiresAt := now.Add(m.ttl)
 
 	m.mu.Lock()
 	m.data[id] = stored{domain: domain, ip: ip, ua: ua, nonce: nonce, difficulty: m.difficulty, expiresAt: expiresAt}
 	m.mu.Unlock()
 
-	return Challenge{ID: id, Prefix: nonce, Difficulty: m.difficulty, ExpiresAt: expiresAt}
+	return Challenge{ID: id, Prefix: nonce, Difficulty: m.difficulty, ExpiresAt: expiresAt}, nil
 }
 
 func (m *Manager) Verify(id, answer, domain, ip, ua string, now time.Time) bool {
@@ -97,12 +104,10 @@ func (m *Manager) Verify(id, answer, domain, ip, ua string, now time.Time) bool 
 	return false
 }
 
-func randomHex(n int) string {
+func randomHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		for i := range b {
-			b[i] = byte(i + 1)
-		}
+		return "", fmt.Errorf("cryptographic randomness unavailable: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }

@@ -2,6 +2,7 @@ package domainstore
 
 import (
 	"context"
+	"log"
 	"strings"
 	"sync"
 
@@ -52,15 +53,19 @@ func (s *Store) Get(ctx context.Context, host string) (Domain, bool) {
 		return d, true
 	}
 	if s.l2 != nil {
-		if d, ok, _ := s.l2.Get(ctx, h); ok {
+		if d, ok, err := s.l2.Get(ctx, h); ok {
 			s.putL1(h, d)
 			return d, true
+		} else if err != nil {
+			log.Printf("domainstore l2 lookup failed host=%s err=%v", h, err)
 		}
 	}
 	if s.l3 != nil {
-		if d, ok, _ := s.l3.Get(ctx, h); ok {
+		if d, ok, err := s.l3.Get(ctx, h); ok {
 			s.putL1(h, d)
 			return d, true
+		} else if err != nil {
+			log.Printf("domainstore l3 lookup failed host=%s err=%v", h, err)
 		}
 	}
 	return Domain{}, false
