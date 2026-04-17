@@ -14,9 +14,12 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["sh", "-c", "exec redis-server --requirepass \"$$(cat /run/secrets/redis_password)\""]
+    # redis_acl secret should define ACL users and passwords, for example:
+    # user default on >strong-password ~* +@read +@write +@set +@keyspace -@dangerous
+    command: ["redis-server", "--aclfile", "/run/secrets/redis_acl"]
     secrets:
       - redis_password
+      - redis_acl
     networks:
       - internal
 
@@ -112,6 +115,8 @@ secrets:
   postgres_password:
     external: true
   redis_password:
+    external: true
+  redis_acl:
     external: true
   jwt_secret:
     external: true

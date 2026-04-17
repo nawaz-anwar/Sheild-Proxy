@@ -5,8 +5,12 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const jwtSecret = readFromEnvOrFile('JWT_SECRET');
-  if (!jwtSecret || jwtSecret === 'change-me') {
+  const normalized = jwtSecret?.toLowerCase().replace(/[_-]/g, '');
+  if (!jwtSecret || normalized === 'changeme') {
     throw new Error('JWT_SECRET must be configured before starting api-nest');
+  }
+  if (jwtSecret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters');
   }
   process.env.JWT_SECRET = jwtSecret;
   const app = await NestFactory.create(AppModule);

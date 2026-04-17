@@ -98,6 +98,7 @@ func applyEnvOverrides(cfg *config.Config) error {
 	if dsn := strings.TrimSpace(os.Getenv("DATABASE_DSN")); dsn != "" {
 		cfg.Postgres.DSN = dsn
 	}
+	originSecretProvided := false
 	if jwtSecret, err := envOrFile("JWT_SECRET"); err != nil {
 		return err
 	} else if jwtSecret != "" {
@@ -106,10 +107,21 @@ func applyEnvOverrides(cfg *config.Config) error {
 	if originSecret, err := envOrFile("ORIGIN_SECRET"); err != nil {
 		return err
 	} else if originSecret != "" {
+		originSecretProvided = true
 		cfg.Proxy.Signing.Secret = originSecret
 	}
 	if cfg.Proxy.Signing.Secret == "" {
 		cfg.Proxy.Signing.Secret = cfg.JWT.Secret
+	}
+	if isProductionMode() {
+		if !originSecretProvided || cfg.Proxy.Signing.Secret == "" {
+			return fmt.Errorf("ORIGIN_SECRET must be explicitly configured in production")
+		}
+		if cfg.Proxy.Signing.Secret == cfg.JWT.Secret {
+			return fmt.Errorf("JWT secret and origin signing secret must be different in production")
+		}
+	} else if originSecretProvided && cfg.Proxy.Signing.Secret == cfg.JWT.Secret {
+		log.Printf("warning: JWT secret and origin signing secret are identical; use separate secrets in production")
 	}
 	if redisPassword, err := envOrFile("REDIS_PASSWORD"); err != nil {
 		return err
@@ -140,4 +152,12 @@ func envOrFile(key string) (string, error) {
 		return "", fmt.Errorf("read %s_FILE: %w", key, err)
 	}
 	return strings.TrimSpace(string(b)), nil
+}
+
+func isProductionMode() bool {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("ENV")))
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(os.Getenv("MODE")))
+	}
+	return mode == "prod" || mode == "production"
 }

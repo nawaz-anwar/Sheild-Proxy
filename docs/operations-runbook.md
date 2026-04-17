@@ -19,6 +19,8 @@
 
 ## Security checklist
 - Rotate secrets (`jwt_secret`, `origin_secret`, `redis_password`, `database_dsn`, `postgres_password`, `grafana_admin_password`) on a regular schedule.
+- Keep JWT and origin-signing secrets separate in production.
 - Use Docker secrets for production (`deployment/docker-compose.prod.yml` expects externally managed secrets).
+- Use Redis ACL file secret (`redis_acl`) instead of passing password via command-line args.
 - Enable SSL at edge by mounting certificates into `deployment/nginx/certs` and enabling TLS server directives.
 - Restrict DB access to internal network paths only; do not publish Postgres/Redis ports in production.

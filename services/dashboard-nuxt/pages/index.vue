@@ -115,7 +115,7 @@ const domains = useDomainsStore();
 const { selectedDomainId } = storeToRefs(domains);
 
 const authForm = reactive({ email: '', password: '' });
-const domainForm = reactive({ clientName: 'default-client', domain: '', upstreamUrl: '' });
+const domainForm = reactive({ clientName: '', domain: '', upstreamUrl: '' });
 
 const overview = reactive<AnalyticsOverview>({ totalRequests: 0, blockedRequests: 0, blockRate: 0 });
 const timeSeries = reactive<TimeSeries>({ hours: 24, points: [] });

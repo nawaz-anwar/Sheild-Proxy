@@ -3,6 +3,9 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'timescaledb') THEN
     CREATE EXTENSION IF NOT EXISTS timescaledb;
 
+    -- NOTE: migrate_data => TRUE rewrites existing request_logs rows.
+    -- For datasets >= 1,000,000 rows, run this during a maintenance window or use a
+    -- dual-write/backfill rollout procedure before cutover to avoid extended lock time.
     PERFORM create_hypertable('request_logs', 'created_at', if_not_exists => TRUE, migrate_data => TRUE);
 
     ALTER TABLE request_logs

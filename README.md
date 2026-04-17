@@ -77,6 +77,7 @@ Security and operations hardening updates include:
 - SSL certificate mount path scaffold for edge nginx (`deployment/nginx/certs`)
 - Internal/private network segmentation for stateful and app services in production compose
 - Startup enforcement for JWT secret in API and secret/env overrides in proxy
+- Production guidance to keep `JWT_SECRET` and `ORIGIN_SECRET` separate
 
 Database schema lifecycle additions:
 
