@@ -1,0 +1,23 @@
+{
+  "name": "dashboard-nuxt",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/**/*.spec.js",
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "lint": "nuxt prepare"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "private": "true",
+  "dependencies": {
+    "nuxt": "^3.14.1592"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}
