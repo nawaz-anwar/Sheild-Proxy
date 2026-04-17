@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Header } from '@nestjs/common';
 import { DomainsService } from './domains/domains.service';
 
 @Controller()
@@ -11,6 +11,7 @@ export class AppController {
   }
 
   @Get('/metrics')
+  @Header('Content-Type', 'text/plain; version=0.0.4')
   async metrics(): Promise<string> {
     const count = await this.domainsService.countDomains();
     return `shield_api_domains_total ${count}\n`;
