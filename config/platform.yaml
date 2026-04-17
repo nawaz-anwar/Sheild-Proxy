@@ -1,0 +1,19 @@
+phase: mvp-core-proxy
+proxy:
+  verified_header: X-Shield-Verified
+  client_id_header: X-Shield-Client-ID
+  domains:
+    - host: localhost
+      upstream: http://dashboard-nuxt:3001
+      client_id: local-dev
+      active: true
+api:
+  domain_verification_prefix: _shield-verify
+redis:
+  key_prefix: shield
+  conventions:
+    challenge: "shield:challenge:{domain}:{ip}"
+    ratelimit: "shield:ratelimit:{domain}:{ip}:{window}"
+  ttl_seconds:
+    challenge: 900
+    ratelimit_window: 60

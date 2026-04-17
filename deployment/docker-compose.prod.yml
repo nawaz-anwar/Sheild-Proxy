@@ -1,0 +1,28 @@
+services:
+  proxy-go:
+    image: shield-proxy/proxy-go:latest
+    restart: unless-stopped
+    environment:
+      PROXY_HTTP_ADDR: :8080
+      PROXY_METRICS_ADDR: :9090
+      CONFIG_FILE: /workspace/config/platform.yaml
+    volumes:
+      - ../config:/workspace/config:ro
+
+  api-nest:
+    image: shield-proxy/api-nest:latest
+    restart: unless-stopped
+
+  dashboard-nuxt:
+    image: shield-proxy/dashboard-nuxt:latest
+    restart: unless-stopped
+
+  edge-nginx:
+    image: openresty/openresty:1.27.1.1-alpine
+    volumes:
+      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - proxy-go
