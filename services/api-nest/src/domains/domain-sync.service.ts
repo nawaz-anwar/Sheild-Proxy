@@ -17,7 +17,7 @@ export class DomainSyncService implements OnModuleDestroy {
     }
     const url = addr.includes('://') ? addr : `redis://${addr}`;
     this.client = createClient({ url });
-    this.connectPromise = this.client.connect().catch(() => undefined);
+    this.connectPromise = this.client.connect().then(() => undefined).catch(() => undefined);
   }
 
   async publishDomainSync(host: string) {

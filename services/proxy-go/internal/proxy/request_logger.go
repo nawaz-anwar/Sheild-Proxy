@@ -32,7 +32,7 @@ type requestLogger struct {
 }
 
 func newRequestLogger(pg *runtime.PostgresClient) *requestLogger {
-	if pg == nil || pg.Pool == nil {
+	if pg == nil || pg.DB == nil {
 		return nil
 	}
 	l := &requestLogger{
@@ -118,7 +118,7 @@ func (l *requestLogger) insertBatch(ctx context.Context, batch []accessLogEntry)
 			normalizeDBText(entry.UserAgent),
 		)
 	}
-	_, err := l.pg.Pool.Exec(
+	_, err := l.pg.DB.ExecContext(
 		ctx,
 		`INSERT INTO request_logs (id, host, method, path, status_code, remote_ip, user_agent) VALUES `+strings.Join(values, ","),
 		args...,

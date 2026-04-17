@@ -3,11 +3,11 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/domainstore"
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/runtime"
 	"github.com/redis/go-redis/v9"
@@ -86,14 +86,14 @@ type pgDomainRow struct {
 }
 
 func newPostgresDomainProvider(pgClient *runtime.PostgresClient) *postgresDomainProvider {
-	if pgClient == nil || pgClient.Pool == nil {
+	if pgClient == nil || pgClient.DB == nil {
 		return nil
 	}
 	return &postgresDomainProvider{pg: pgClient}
 }
 
 func (p *postgresDomainProvider) Get(ctx context.Context, host string) (domainstore.Domain, bool, error) {
-	row := p.pg.Pool.QueryRow(
+	row := p.pg.DB.QueryRowContext(
 		ctx,
 		`SELECT domain, upstream_url, client_id::text, status = 'active'
 		   FROM domains
@@ -104,7 +104,10 @@ func (p *postgresDomainProvider) Get(ctx context.Context, host string) (domainst
 
 	var rec pgDomainRow
 	if err := row.Scan(&rec.Host, &rec.Upstream, &rec.ClientID, &rec.Active); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return domainstore.Domain{}, false, err
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "no rows") {
 			return domainstore.Domain{}, false, nil
 		}
 		return domainstore.Domain{}, false, err
@@ -118,7 +121,7 @@ func (p *postgresDomainProvider) Get(ctx context.Context, host string) (domainst
 }
 
 func (p *postgresDomainProvider) LoadActive(ctx context.Context) ([]domainstore.Domain, error) {
-	rows, err := p.pg.Pool.Query(
+	rows, err := p.pg.DB.QueryContext(
 		ctx,
 		`SELECT domain, upstream_url, client_id::text, status = 'active'
 		   FROM domains`,
@@ -140,5 +143,8 @@ func (p *postgresDomainProvider) LoadActive(ctx context.Context) ([]domainstore.
 			Active:   rec.Active,
 		})
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

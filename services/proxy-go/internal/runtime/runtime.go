@@ -2,14 +2,15 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/url"
 	"strings"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/nawaz-anwar/Sheild-Proxy/services/proxy-go/internal/config"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -25,8 +26,8 @@ type RedisClient struct {
 }
 
 type PostgresClient struct {
-	Pool *pgxpool.Pool
-	DSN  string
+	DB  *sql.DB
+	DSN string
 }
 
 func Init(cfg *config.Config) (*Dependencies, error) {
@@ -50,7 +51,7 @@ func (d *Dependencies) Close() {
 		log.Printf("runtime: redis client closed addr=%s", d.Redis.Addr)
 	}
 	if d.Postgres != nil {
-		d.Postgres.Pool.Close()
+		_ = d.Postgres.DB.Close()
 		log.Printf("runtime: postgres client closed")
 	}
 }
@@ -80,18 +81,21 @@ func initPostgres(cfg config.PostgresConfig) (*PostgresClient, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("postgres dsn is required")
 	}
-	pool, err := pgxpool.New(context.Background(), dsn)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("create postgres pool: %w", err)
+		return nil, fmt.Errorf("create postgres connection pool: %w", err)
 	}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("postgres ping failed: %w", err)
 	}
 	log.Printf("runtime: postgres initialized")
-	return &PostgresClient{Pool: pool, DSN: dsn}, nil
+	return &PostgresClient{DB: db, DSN: dsn}, nil
 }
 
 func redisOptions(addr string) (*redis.Options, error) {

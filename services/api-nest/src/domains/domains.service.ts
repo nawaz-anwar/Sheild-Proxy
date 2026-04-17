@@ -88,7 +88,7 @@ export class DomainsService {
   async updateRules(domainId: string, rules: RuleInput[]) {
     const result = await this.rulesService.replaceDomainRules(domainId, rules);
     const domain = await this.db.query<{ domain: string }>('SELECT domain FROM domains WHERE id = $1', [domainId]);
-    if (domain.rowCount > 0) {
+    if ((domain.rowCount ?? 0) > 0) {
       await this.domainSyncService.publishDomainSync(domain.rows[0].domain);
     }
     return result;
