@@ -10,6 +10,11 @@ export class DomainsController {
     return this.domainsService.list();
   }
 
+  @Get('/:id')
+  getById(@Param('id') id: string) {
+    return this.domainsService.getById(id);
+  }
+
   @Post('/register')
   register(@Body() body: { clientName: string; domain: string; upstreamUrl: string }) {
     return this.domainsService.register(body.clientName, body.domain, body.upstreamUrl);
@@ -20,9 +25,24 @@ export class DomainsController {
     return this.domainsService.status(id);
   }
 
+  @Post('/:id/initiate-verification')
+  initiateVerification(@Param('id') id: string) {
+    return this.domainsService.initiateVerification(id);
+  }
+
   @Post('/:id/verify-dns')
   verifyDns(@Param('id') id: string) {
     return this.domainsService.verifyDns(id);
+  }
+
+  @Post('/:id/check-connection')
+  checkConnection(@Param('id') id: string) {
+    return this.domainsService.checkConnection(id);
+  }
+
+  @Get('/:id/verification-logs')
+  getVerificationLogs(@Param('id') id: string) {
+    return this.domainsService.getVerificationLogs(id);
   }
 
   @Put('/:id/rules')
