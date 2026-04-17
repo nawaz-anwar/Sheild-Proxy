@@ -40,4 +40,26 @@ The API now exposes scaffold responsibilities for:
 - Rules service layer backed by `proxy_rules`
 - Analytics overview endpoint (`GET /analytics/overview`)
 
+Part 3 continuation now also includes:
+
+- Analytics time-series endpoint (`GET /analytics/time-series`)
+- Analytics top IPs endpoint (`GET /analytics/top-ips`)
+- Domains listing endpoint (`GET /domains`)
+
+## Dashboard scaffold (Part 4 start)
+
+The Nuxt dashboard now includes:
+
+- API layer routes for Auth, Domains, and Analytics (`services/dashboard-nuxt/server/api/**`)
+- Pinia stores: `auth` and `domains`
+- Dashboard UI with stats cards, traffic chart bars, and top-IP insights
+
+## Deployment scaffold (Part 5 start)
+
+Deployment compose scaffolds now include:
+
+- Core services: Proxy, API, Dashboard, Nginx, Redis, Postgres
+- Observability services: Prometheus and Grafana
+- Prometheus scrape config at `deployment/prometheus/prometheus.yml`
+
 These are implementation foundations intended for iterative hardening in subsequent phases.

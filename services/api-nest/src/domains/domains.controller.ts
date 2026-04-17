@@ -5,6 +5,11 @@ import { DomainsService } from './domains.service';
 export class DomainsController {
   constructor(private readonly domainsService: DomainsService) {}
 
+  @Get()
+  list() {
+    return this.domainsService.list();
+  }
+
   @Post('/register')
   register(@Body() body: { clientName: string; domain: string; upstreamUrl: string }) {
     return this.domainsService.register(body.clientName, body.domain, body.upstreamUrl);

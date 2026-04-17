@@ -1,4 +1,16 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shield_proxy
+      POSTGRES_USER: shield
+      POSTGRES_PASSWORD: shield
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
   proxy-go:
     image: shield-proxy/proxy-go:latest
     restart: unless-stopped
@@ -12,10 +24,14 @@ services:
   api-nest:
     image: shield-proxy/api-nest:latest
     restart: unless-stopped
+    env_file:
+      - ../config/platform.env.example
 
   dashboard-nuxt:
     image: shield-proxy/dashboard-nuxt:latest
     restart: unless-stopped
+    environment:
+      BACKEND_API_BASE: http://api-nest:3000
 
   edge-nginx:
     image: openresty/openresty:1.27.1.1-alpine
@@ -26,3 +42,26 @@ services:
       - "443:443"
     depends_on:
       - proxy-go
+
+  prometheus:
+    image: prom/prometheus:v3.4.2
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090"
+    depends_on:
+      - proxy-go
+      - api-nest
+      - dashboard-nuxt
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3002:3000"
+    depends_on:
+      - prometheus

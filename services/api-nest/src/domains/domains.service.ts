@@ -68,6 +68,19 @@ export class DomainsService {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  async list() {
+    const result = await this.db.query<{ id: string; domain: string; upstream_url: string; status: string; created_at: Date }>(
+      'SELECT id, domain, upstream_url, status, created_at FROM domains ORDER BY created_at DESC',
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      domain: row.domain,
+      upstreamUrl: row.upstream_url,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
+  }
+
   async updateRules(domainId: string, rules: RuleInput[]) {
     return this.rulesService.replaceDomainRules(domainId, rules);
   }
