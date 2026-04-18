@@ -36,7 +36,7 @@ export class DnsVerificationService {
 
   constructor(private readonly db: DatabaseService) {}
 
-  generateVerificationToken(): string {
+  generateVerificationTokenId(): string {
     return randomUUID();
   }
 
@@ -49,7 +49,7 @@ export class DnsVerificationService {
     txtRecordName: string;
     txtRecordValue: string;
   }> {
-    const token = this.generateVerificationToken();
+    const tokenId = this.generateVerificationTokenId();
     
     const result = await this.db.query(
       `UPDATE domains 
@@ -58,7 +58,7 @@ export class DnsVerificationService {
            verification_attempts = 0
        WHERE id = $2
        RETURNING domain`,
-      [token, domainId]
+       [tokenId, domainId]
     );
 
     if (result.rows.length === 0) {
@@ -69,14 +69,14 @@ export class DnsVerificationService {
     const txtRecordName = this.getTxtRecordName(domain);
 
     await this.logVerification(domainId, 'initiated', 'success', {
-      token,
+      tokenId,
       txtRecordName,
     });
 
     return {
-      verificationToken: token,
+      verificationToken: tokenId,
       txtRecordName,
-      txtRecordValue: this.buildTxtVerificationValue(token),
+      txtRecordValue: this.buildTxtVerificationValue(tokenId),
     };
   }
 
