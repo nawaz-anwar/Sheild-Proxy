@@ -8,6 +8,10 @@ export default defineNuxtConfig({
   ],
   runtimeConfig: {
     backendApiBase: process.env.NUXT_BACKEND_API_BASE ?? 'http://api:3000',
+    public: {
+      proxyCnameTarget: process.env.NUXT_PUBLIC_PROXY_CNAME_TARGET ?? 'proxy.shieldproxy.com',
+      proxyServerIp: process.env.NUXT_PUBLIC_PROXY_SERVER_IP ?? '<PROXY_SERVER_IP>',
+    },
   },
   css: ['~/assets/css/main.css'],
   app: {

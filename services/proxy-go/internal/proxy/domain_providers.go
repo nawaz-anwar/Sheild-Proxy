@@ -99,6 +99,9 @@ func (p *postgresDomainProvider) Get(ctx context.Context, host string) (domainst
 		`SELECT domain, upstream_url, client_id::text, status = 'active'
 		   FROM domains
 		  WHERE lower(domain) = lower($1)
+		    AND verified = TRUE
+		    AND proxy_connected = TRUE
+		    AND status = 'active'
 		  LIMIT 1`,
 		strings.ToLower(strings.TrimSpace(host)),
 	)
@@ -125,7 +128,10 @@ func (p *postgresDomainProvider) LoadActive(ctx context.Context) ([]domainstore.
 	rows, err := p.pg.DB.QueryContext(
 		ctx,
 		`SELECT domain, upstream_url, client_id::text, status = 'active'
-		   FROM domains`,
+		   FROM domains
+		  WHERE verified = TRUE
+		    AND proxy_connected = TRUE
+		    AND status = 'active'`,
 	)
 	if err != nil {
 		return nil, err

@@ -17,11 +17,17 @@ export class DnsVerificationService {
   private readonly MAX_VERIFICATION_ATTEMPTS = 10;
   private readonly VERIFICATION_PREFIX = 'sp-verify-';
   private readonly TXT_RECORD_NAME = '_shieldproxy';
+  private readonly DNS_MAX_RETRIES = Number(process.env.DNS_VERIFICATION_RETRIES ?? 3);
+  private readonly DNS_TIMEOUT_MS = Number(process.env.DNS_VERIFICATION_TIMEOUT_MS ?? 5000);
+  private readonly DNS_RETRY_DELAY_MS = Number(process.env.DNS_VERIFICATION_RETRY_DELAY_MS ?? 1000);
+  private readonly proxyCnameTarget = this.normalizeDnsName(
+    process.env.PROXY_CNAME_TARGET ?? 'proxy.shieldproxy.com',
+  );
 
   constructor(private readonly db: DatabaseService) {}
 
   generateVerificationToken(): string {
-    return `${this.VERIFICATION_PREFIX}${randomUUID()}`;
+    return randomUUID();
   }
 
   getTxtRecordName(domain: string): string {
@@ -60,7 +66,7 @@ export class DnsVerificationService {
     return {
       verificationToken: token,
       txtRecordName,
-      txtRecordValue: token,
+      txtRecordValue: this.buildTxtVerificationValue(token),
     };
   }
 
@@ -144,19 +150,33 @@ export class DnsVerificationService {
 
   private async checkDnsTxtRecord(
     domain: string,
-    expectedToken: string
+    expectedToken: string | null
   ): Promise<DnsVerificationResult> {
     const txtRecordName = this.getTxtRecordName(domain);
+    const expectedTxtValue = this.buildTxtVerificationValue(expectedToken);
 
     try {
       this.logger.log(`Checking TXT record for ${txtRecordName}`);
       
-      const records = await dns.resolveTxt(txtRecordName);
+      const records = await this.resolveWithRetry<readonly string[][]>(
+        `TXT ${txtRecordName}`,
+        () => dns.resolveTxt(txtRecordName),
+      );
       const flatRecords = records.map((r) => r.join(''));
 
       this.logger.log(`Found TXT records: ${JSON.stringify(flatRecords)}`);
 
-      const hasValidToken = flatRecords.some((record) => record === expectedToken);
+      if (!expectedTxtValue) {
+        return {
+          success: false,
+          verified: false,
+          message: 'Verification token is not available. Re-initiate verification and try again.',
+          records: flatRecords,
+          error: 'TOKEN_MISSING',
+        };
+      }
+
+      const hasValidToken = flatRecords.some((record) => this.normalizeTxtValue(record) === expectedTxtValue);
 
       if (hasValidToken) {
         return {
@@ -217,40 +237,51 @@ export class DnsVerificationService {
     }
 
     try {
-      // Check CNAME record
-      try {
-        const cnameRecords = await dns.resolveCname(domain);
-        const hasProxyCname = cnameRecords.some((record) =>
-          record.includes('proxy.shieldproxy.com')
-        );
+      const cnameHostsToCheck = [domain, `www.${domain}`];
+      for (const cnameHost of cnameHostsToCheck) {
+        try {
+          const cnameRecords = await this.resolveWithRetry<string[]>(
+            `CNAME ${cnameHost}`,
+            () => dns.resolveCname(cnameHost),
+          );
+          const hasProxyCname = cnameRecords.some(
+            (record) => this.normalizeDnsName(record) === this.proxyCnameTarget,
+          );
 
-        if (hasProxyCname) {
-          await this.updateProxyConnection(domainId, true, 'cname', cnameRecords);
-          return {
-            connected: true,
-            method: 'cname',
-            records: cnameRecords,
-            message: 'Domain connected via CNAME',
-          };
-        }
-      } catch (cnameError: any) {
-        // CNAME not found, try A record
-        if (cnameError.code === 'ENODATA' || cnameError.code === 'ENOTFOUND') {
-          // Continue to A record check
-        } else {
-          throw cnameError;
+          if (hasProxyCname) {
+            await this.updateProxyConnection(domainId, true, 'cname', {
+              host: cnameHost,
+              values: cnameRecords,
+              target: this.proxyCnameTarget,
+            });
+            return {
+              connected: true,
+              method: 'cname',
+              records: { host: cnameHost, values: cnameRecords },
+              message: `Domain connected via CNAME (${cnameHost} -> ${this.proxyCnameTarget})`,
+            };
+          }
+        } catch (cnameError: any) {
+          if (cnameError.code !== 'ENODATA' && cnameError.code !== 'ENOTFOUND') {
+            throw cnameError;
+          }
         }
       }
 
       // Check A record
-      const aRecords = await dns.resolve4(domain);
-      // TODO: Replace with actual proxy server IP
-      const PROXY_SERVER_IP = process.env.PROXY_SERVER_IP || '0.0.0.0';
-      
-      const hasProxyARecord = aRecords.some((record) => record === PROXY_SERVER_IP);
+      const aRecords = await this.resolveWithRetry<string[]>(
+        `A ${domain}`,
+        () => dns.resolve4(domain),
+      );
+      const proxyServerIPs = this.getConfiguredProxyIPs();
+      const hasProxyARecord = aRecords.some((record) => proxyServerIPs.has(record));
 
       if (hasProxyARecord) {
-        await this.updateProxyConnection(domainId, true, 'a_record', aRecords);
+        await this.updateProxyConnection(domainId, true, 'a_record', {
+          host: domain,
+          values: aRecords,
+          acceptedProxyIps: Array.from(proxyServerIPs),
+        });
         return {
           connected: true,
           method: 'a_record',
@@ -261,7 +292,10 @@ export class DnsVerificationService {
 
       return {
         connected: false,
-        message: 'Domain not pointing to ShieldProxy servers',
+        message:
+          proxyServerIPs.size > 0
+            ? `Domain is not pointing to ShieldProxy (expected CNAME target "${this.proxyCnameTarget}" or A record IP in [${Array.from(proxyServerIPs).join(', ')}])`
+            : `Domain is not pointing to ShieldProxy (expected CNAME target "${this.proxyCnameTarget}")`,
       };
     } catch (error: any) {
       this.logger.error(`Proxy connection check failed: ${error.message}`);
@@ -320,5 +354,93 @@ export class DnsVerificationService {
       [domainId, limit]
     );
     return result.rows;
+  }
+
+  private buildTxtVerificationValue(token: string | null | undefined): string {
+    const raw = (token ?? '').trim();
+    if (!raw) {
+      return '';
+    }
+    if (raw.startsWith(this.VERIFICATION_PREFIX)) {
+      return raw;
+    }
+    return `${this.VERIFICATION_PREFIX}${raw}`;
+  }
+
+  private normalizeTxtValue(value: string): string {
+    return value.trim().replace(/^"+|"+$/g, '');
+  }
+
+  private normalizeDnsName(value: string): string {
+    return value.trim().toLowerCase().replace(/\.$/, '');
+  }
+
+  private getConfiguredProxyIPs(): Set<string> {
+    const configured = (process.env.PROXY_SERVER_IPS ?? process.env.PROXY_SERVER_IP ?? '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+    return new Set(configured);
+  }
+
+  private async resolveWithRetry<T>(
+    label: string,
+    resolver: () => Promise<T>,
+  ): Promise<T> {
+    let lastError: any;
+    const maxAttempts = Math.max(1, this.DNS_MAX_RETRIES);
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.withTimeout(resolver(), this.DNS_TIMEOUT_MS);
+      } catch (error: any) {
+        lastError = error;
+        const retryable = this.isRetryableDnsError(error);
+        if (!retryable || attempt === maxAttempts) {
+          break;
+        }
+        this.logger.warn(
+          `DNS lookup retry ${attempt}/${maxAttempts} for ${label} failed: ${error.message}`,
+        );
+        await this.delay(this.DNS_RETRY_DELAY_MS);
+      }
+    }
+    throw lastError;
+  }
+
+  private isRetryableDnsError(error: any): boolean {
+    const code = String(error?.code ?? '').toUpperCase();
+    return [
+      'ETIMEOUT',
+      'ENOTFOUND',
+      'ENODATA',
+      'ESERVFAIL',
+      'EAI_AGAIN',
+      'ECONNREFUSED',
+      'EHOSTUNREACH',
+      'ENETUNREACH',
+    ].includes(code);
+  }
+
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const timeoutError = new Error(`DNS lookup timeout after ${timeoutMs}ms`) as NodeJS.ErrnoException;
+        timeoutError.code = 'ETIMEOUT';
+        reject(timeoutError);
+      }, timeoutMs);
+      promise
+        .then((result) => {
+          clearTimeout(timer);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
+
+  private async delay(ms: number): Promise<void> {
+    await new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 }

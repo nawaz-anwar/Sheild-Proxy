@@ -89,21 +89,22 @@
               <div class="bg-white rounded-lg p-3 border border-blue-200">
                 <div class="flex items-center justify-between mb-1">
                   <span class="text-xs font-medium text-gray-600">Name</span>
-                  <button @click="copyToClipboard(txtRecordName)" class="text-xs text-primary-600 hover:text-primary-700">
+                  <button @click="copyToClipboard(txtRecordHost)" class="text-xs text-primary-600 hover:text-primary-700">
                     Copy
                   </button>
                 </div>
-                <p class="text-sm font-mono text-gray-900 break-all">{{ txtRecordName }}</p>
+                <p class="text-sm font-mono text-gray-900 break-all">{{ txtRecordHost }}</p>
+                <p class="text-xs text-gray-500 mt-1">FQDN: {{ txtRecordName }}</p>
               </div>
 
               <div class="bg-white rounded-lg p-3 border border-blue-200">
                 <div class="flex items-center justify-between mb-1">
                   <span class="text-xs font-medium text-gray-600">Value</span>
-                  <button @click="copyToClipboard(domain.verificationToken)" class="text-xs text-primary-600 hover:text-primary-700">
+                  <button @click="copyToClipboard(verificationTxtValue)" class="text-xs text-primary-600 hover:text-primary-700">
                     Copy
                   </button>
                 </div>
-                <p class="text-sm font-mono text-gray-900 break-all">{{ domain.verificationToken }}</p>
+                <p class="text-sm font-mono text-gray-900 break-all">{{ verificationTxtValue }}</p>
               </div>
             </div>
           </div>
@@ -122,7 +123,7 @@
           <div class="flex items-center gap-3">
             <UiButton @click="handleVerifyDns" :loading="verifying" class="flex-1">
               <span v-if="verifying">Verifying...</span>
-              <span v-else>Verify DNS Record</span>
+              <span v-else>Verify Now</span>
             </UiButton>
             <p class="text-xs text-gray-500">
               Attempts: {{ domain.verificationAttempts || 0 }}/10
@@ -173,15 +174,15 @@
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
                     <span class="text-xs text-gray-600">Name:</span>
-                    <button @click="copyToClipboard(domain.domain)" class="text-xs text-primary-600">Copy</button>
+                    <button @click="copyToClipboard(cnameRecordHost)" class="text-xs text-primary-600">Copy</button>
                   </div>
-                  <p class="text-sm font-mono bg-gray-50 p-2 rounded">{{ domain.domain }}</p>
+                  <p class="text-sm font-mono bg-gray-50 p-2 rounded">{{ cnameRecordHost }}</p>
                   
                   <div class="flex items-center justify-between">
                     <span class="text-xs text-gray-600">Value:</span>
-                    <button @click="copyToClipboard('proxy.shieldproxy.com')" class="text-xs text-primary-600">Copy</button>
+                    <button @click="copyToClipboard(proxyCnameTarget)" class="text-xs text-primary-600">Copy</button>
                   </div>
-                  <p class="text-sm font-mono bg-gray-50 p-2 rounded">proxy.shieldproxy.com</p>
+                  <p class="text-sm font-mono bg-gray-50 p-2 rounded">{{ proxyCnameTarget }}</p>
                 </div>
               </div>
 
@@ -253,6 +254,7 @@ definePageMeta({
 
 const route = useRoute();
 const domainId = route.params.id as string;
+const config = useRuntimeConfig();
 
 const domain = ref<any>(null);
 const loading = ref(true);
@@ -262,11 +264,24 @@ const checkingConnection = ref(false);
 const verificationMessage = ref<string | null>(null);
 const connectionMessage = ref<string | null>(null);
 
-const proxyServerIP = '0.0.0.0'; // TODO: Replace with actual proxy server IP
+const proxyCnameTarget = computed(() => config.public.proxyCnameTarget as string);
+const proxyServerIP = computed(() => config.public.proxyServerIp as string);
+const txtRecordHost = '_shieldproxy';
 
 const txtRecordName = computed(() => {
   if (!domain.value) return '';
   return `_shieldproxy.${domain.value.domain}`;
+});
+
+const cnameRecordHost = computed(() => {
+  if (!domain.value?.domain) return 'www';
+  return domain.value.domain.startsWith('www.') ? domain.value.domain : `www.${domain.value.domain}`;
+});
+
+const verificationTxtValue = computed(() => {
+  const token = (domain.value?.verificationToken ?? '').trim();
+  if (!token) return '';
+  return token.startsWith('sp-verify-') ? token : `sp-verify-${token}`;
 });
 
 const statusLabel = computed(() => {
