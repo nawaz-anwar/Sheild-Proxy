@@ -20,6 +20,16 @@ export class DnsVerificationService {
   private readonly DNS_MAX_RETRIES = Number(process.env.DNS_VERIFICATION_RETRIES ?? 3);
   private readonly DNS_TIMEOUT_MS = Number(process.env.DNS_VERIFICATION_TIMEOUT_MS ?? 5000);
   private readonly DNS_RETRY_DELAY_MS = Number(process.env.DNS_VERIFICATION_RETRY_DELAY_MS ?? 1000);
+  private readonly retryableDnsErrorCodes = new Set([
+    'ETIMEOUT',
+    'ENOTFOUND',
+    'ENODATA',
+    'ESERVFAIL',
+    'EAI_AGAIN',
+    'ECONNREFUSED',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+  ]);
   private readonly proxyCnameTarget = this.normalizeDnsName(
     process.env.PROXY_CNAME_TARGET ?? 'proxy.shieldproxy.com',
   );
@@ -292,10 +302,7 @@ export class DnsVerificationService {
 
       return {
         connected: false,
-        message:
-          proxyServerIPs.size > 0
-            ? `Domain is not pointing to ShieldProxy (expected CNAME target "${this.proxyCnameTarget}" or A record IP in [${Array.from(proxyServerIPs).join(', ')}])`
-            : `Domain is not pointing to ShieldProxy (expected CNAME target "${this.proxyCnameTarget}")`,
+        message: this.buildConnectionExpectationMessage(proxyServerIPs),
       };
     } catch (error: any) {
       this.logger.error(`Proxy connection check failed: ${error.message}`);
@@ -409,16 +416,7 @@ export class DnsVerificationService {
 
   private isRetryableDnsError(error: any): boolean {
     const code = String(error?.code ?? '').toUpperCase();
-    return [
-      'ETIMEOUT',
-      'ENOTFOUND',
-      'ENODATA',
-      'ESERVFAIL',
-      'EAI_AGAIN',
-      'ECONNREFUSED',
-      'EHOSTUNREACH',
-      'ENETUNREACH',
-    ].includes(code);
+    return this.retryableDnsErrorCodes.has(code);
   }
 
   private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -442,5 +440,12 @@ export class DnsVerificationService {
 
   private async delay(ms: number): Promise<void> {
     await new Promise<void>((resolve) => setTimeout(resolve, ms));
+  }
+
+  private buildConnectionExpectationMessage(proxyServerIPs: Set<string>): string {
+    if (proxyServerIPs.size === 0) {
+      return `Domain is not pointing to ShieldProxy (expected CNAME target "${this.proxyCnameTarget}")`;
+    }
+    return `Domain is not pointing to ShieldProxy (expected CNAME target "${this.proxyCnameTarget}" or A record IP in [${Array.from(proxyServerIPs).join(', ')}])`;
   }
 }

@@ -275,7 +275,7 @@ const txtRecordName = computed(() => {
 
 const cnameRecordHost = computed(() => {
   if (!domain.value?.domain) return 'www';
-  return domain.value.domain.startsWith('www.') ? domain.value.domain : `www.${domain.value.domain}`;
+  return getRecommendedCnameHost(domain.value.domain);
 });
 
 const verificationTxtValue = computed(() => {
@@ -384,6 +384,11 @@ const formatDate = (date: string | null) => {
     hour: '2-digit',
     minute: '2-digit',
   });
+};
+
+const getRecommendedCnameHost = (host: string) => {
+  const normalized = host.trim().toLowerCase();
+  return normalized.startsWith('www.') ? normalized : `www.${normalized}`;
 };
 
 onMounted(() => {
